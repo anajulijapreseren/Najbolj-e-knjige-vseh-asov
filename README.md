@@ -4,12 +4,27 @@ V okviru predmeta programiranje 1 bom analizirala najbolj priljubljene knjige.
 Podatke o knjigah bom zajela s spletne strani goodreads: https://www.goodreads.com/list/show/1.Best_Books_Ever. Preučila bom prvih 10.000 knjig, razvrščenih po oceni bralcev. Ocena sestoji iz števila bralcev, ki so knjigo ocenili, in višine njihove ocene.
 
 Za vsako knjigo bom zajela naslednje podatke:<br/>
--naslov in avtorja<br/>
--založbo in datum izida<br/>
+-naslov, avtorja in id avtorja<br/>
+-založbo in leto izida<br/>
 -serija / solo knjiga<br/>
--prvih 5 žanrov po izboru bralcev<br/>
+-opis<br/>
+-prve 3 žanre po izboru bralcev<br/>
 -skupno oceno bralcev, povprečno oceno(1-5), število ocen in število "reviewov"<br/>
 -morebitne literarne nagrade<br/>
+
+CSV datoteke:<br/>
+Datoteke dobimo s pogonom lepe_knjige.py. Funkcije: pripravi_imenik, zapisi_json in zapisi_csv so vzete iz https://github.com/matijapretnar/programiranje-1/tree/master/02-zajem-podatkov/predavanja iz datoteke orodja.py.
+
+knjige.csv vsebujejo:<br/>
+knjiga, id_knjige, avtor, id_avtor, serija, opis, leto, zalozba, povprecna_ocena, score,st_glasov, st_ocen,st_reviewov<br/>
+
+zanri.csv vsebujejo:<br/>
+id_knjige,zanr<br/>
+
+nagrade.csv vsebujejo:<br/>
+id_knjige,nagrada<br/>
+
+Opomba: trenutno je v csv datotekah naloženih le 100 knjig. Preostale knjige bom naložila, ko se bom odločila, koliko knjig bom analizirala. Spletna stran ima namreč podstrani, kar pomeni, da je treba za 10000 knjig prenesti 10000 datotek (in še 100 za naložitev "glavnih strani")
 
 
 Hipoteze<br/>
