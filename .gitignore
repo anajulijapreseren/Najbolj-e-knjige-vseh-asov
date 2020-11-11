@@ -127,3 +127,5 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+Pridobivanje_podatkov/best_books.html
+Pridobivanje_podatkov/book_subpage.html
