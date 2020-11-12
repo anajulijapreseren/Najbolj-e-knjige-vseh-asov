@@ -207,7 +207,7 @@ def main(redownload=True, reparse=True):
         id = 1
 
         #shranimo eno od strani, ki jih moramo analizirati
-        #save_frontpage(book_frontpage_url.format(i), book_directory, frontpage_filename)
+        save_frontpage(book_frontpage_url.format(i), book_directory, frontpage_filename)
 
         #iz te strani poberemo podatke, ki jih ne najdemo na podstrani posamezne knjige in url, ki
         #nas bo peljal na podstran vsake knjige, da dobimo ostale podatke
@@ -229,8 +229,10 @@ def main(redownload=True, reparse=True):
         #sedaj moramo prenesti podstran vsake knjige:
         #v datoteko shranimo podstran ene knjige, pridobimo podatke in jih nekam shranimo, 
         #nato pa shranimo naslednjo podstran in povozimo prejsnjo datoteko
+        k=0
+        
         for j in range(0,len(urlji),2):
-            k=0
+            
             slovar_knjige = {}
             save_frontpage(book_subpage_url.format(urlji[j]), book_directory, subpage_filename)
             with open(r"C:\Users\Ana Julija\Documents\Najbolj-e-knjige-vseh-asov\Pridobivanje_podatkov\book_subpage.html", "r", encoding="utf-8") as sub:
