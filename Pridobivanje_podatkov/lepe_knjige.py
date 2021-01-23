@@ -9,7 +9,6 @@ import os.path
 import json
 import sys
 
-
 SKUPNO_ST_KNJIG = 100
 ST_KNJIG_NA_STRAN = 100 #konstantno, ne moremo spremeniti
 ST_STRANI = math.ceil(SKUPNO_ST_KNJIG / ST_KNJIG_NA_STRAN)
@@ -46,19 +45,21 @@ vzorec_zanr = r'people shelved this book as &#39;(?P<zanr>.+)&#39;'
 vzorec_st_ocen_zanra = r'(?P<st_ocen_zanra>\d+) people shelved this book as &#39;'
 vzorec_nagrade = r'award\/show\/.*?>(?P<nagrade>.+?)(?:\(|<)'
 vzorec_leto_nagrade = r'award/show/.*?>.+?\((?P<leto_nagrade>\d*)\)</a>'
+#ta vzopec je za prvo leto izida (first published in _)saj so nekatere knjige izdali večkrat
+vzorec_leto2 = r'<div class="row">\s*Published\s*<nobr class="greyText">\s*\(.*(?P<leto>\d{4})\)\s*<\/nobr>'
 
 vzorec_st_opisa = r'<span id="freeTextContainer(\d+)">'
 vzorec_podrobnega_opisa = '<span id="freeText{}" style=".*">'
 
 vzorec_opis_navaden = r'<span id="freeTextContainer\d+">(.*?)</span>'
-vzorec_opis_podroben = r'<span id="freeText\d+" style=".*?">(.*?)</span>'
+vzorec_opis_podroben = r'<span id="freeText\d+" style=".*?">(?:Alternate.*?<br \/>)*(.*?)<\/span>'
+
 
 def pripravi_imenik(ime_datoteke):
     '''Če še ne obstaja, pripravi prazen imenik za dano datoteko.'''
     imenik = os.path.dirname(ime_datoteke)
     if imenik:
         os.makedirs(imenik, exist_ok=True)
-
 
 def zapisi_json(objekt, ime_datoteke):
     '''Iz danega objekta ustvari JSON datoteko.'''
@@ -139,8 +140,8 @@ def predelaj_opis(opis, naslov):
     """Funkcija sprejme besedilo, ki ga dobimo z regularnim izrazom,
     in ga predela v uporabniku lepo obliko, torej odstrani <b>,<i>...in nezeljene podatke"""
 
-    opis = opis.replace("<em>", "").replace("</em>", "").replace("<br>", " ").replace("<b>", "").replace("</b>", "").replace("<br />", " ")
-    opis = opis.replace("<a>", "").replace("</a>", "").replace('\"', "").replace("<p>", "").replace("</p>", "")
+    opis = opis.replace("<em>", "").replace("</em>", "").replace("<br>", " ").replace("<b>", "").replace("</b>", "").replace("<br />", " ").replace("<br/>", " ")
+    opis = opis.replace("<a>", "").replace("</a>", "").replace('\"', "").replace("<p>", "").replace("</p>", "").replace("(back cover)","")
     
     while "<i>" in opis:
         zacetek = opis.find("<i>")
@@ -151,9 +152,9 @@ def predelaj_opis(opis, naslov):
     opis = opis.replace("</i>", "") 
 
     #Problem: vcasih se v <i>...</i> skrivajo informacije, ki nimajo zveze z opisom(npr. alternative cover),
-    #drugic pa naslov. Zato po odstranitvi preverimo, če se opis sedaj začne s presledkom.
+    #drugic pa naslov. Zato po odstranitvi preverimo, če se opis sedaj začne s presledkom, is, was...
     #To pomeni, da smo izbrisali posevno zapisan naslov, torej ga spet dodamo.
-    if opis[0] == " ":
+    if (opis[:3] == " is" or opis[:4] == " was" or opis[:4] == " has" or opis[:5] == " have"):
         opis = naslov + opis
 
     return opis
@@ -191,10 +192,13 @@ def spremeni_v_apostrof(seznam):
 
 
 def main(redownload=True, reparse=True):
-
+    #spletna stran ima vsake toliko časa napako(npr. https://www.goodreads.com/book/show/18765.I_Claudius)
+    #te knjige moramo izlociti(to naredimo, ko ugotovimo da "knjiga nima naslova")
+    #id te knjige damo naslednji knjigi, zato vzpostavimo error_counter
+    error_counter = 0
     # Najprej v lokalno datoteko shranimo eno od glavnih strani
-    for i in range(1, ST_STRANI + 1):
-
+    for i in range(1, 5):#ST_STRANI + 1):
+        print("koncal {} stran".format(i-1))
         #vse podatke o knjigah(shranjeni so v slovarju) shranimo v sezname:
         #seznam, uporabljen za json file
         vse_knjige = []
@@ -203,8 +207,9 @@ def main(redownload=True, reparse=True):
         zanri = []
         nagrade = []
 
-        #id_knjige
-        id = 1
+        
+        id = (i-1)*ST_KNJIG_NA_STRAN + 1
+        
 
         #shranimo eno od strani, ki jih moramo analizirati
         save_frontpage(book_frontpage_url.format(i), book_directory, frontpage_filename)
@@ -242,54 +247,90 @@ def main(redownload=True, reparse=True):
                 # (id_avtor, score, st_glasov, te podatke bom zaradi lepsega izgleda slovarja vrinila med ostale
 
                 #KNJIGE
-                slovar_knjige["knjiga"] = re.findall(vzorec_knjiga, besedilo)[0]
-                slovar_knjige["id_knjige"] = id
-                slovar_knjige["avtor"] = re.findall(vzorec_avtor, besedilo)[0]
-                slovar_knjige["id_avtor"] = int(id_avtor[k])
-                slovar_knjige["serija"] = re.findall(vzorec_serija, besedilo) != []
-                slovar_knjige["opis"] = predelaj_opis(izloci_opis(besedilo),slovar_knjige["knjiga"])
-                slovar_knjige["leto"] = int(re.findall(vzorec_leto, besedilo)[0])
-                slovar_knjige["zalozba"] = re.findall(vzorec_zalozba, besedilo)[0]
-                slovar_knjige["povprecna_ocena"] = float(re.findall(vzorec_povprecna_ocena, besedilo)[0])
-                slovar_knjige["score"] = int(score[k].replace(",", ""))
-                slovar_knjige["st_glasov"] = int(st_glasov[k].replace(",", ""))
-                slovar_knjige["st_ocen"] = int(re.findall(vzorec_st_ocen, besedilo)[0].replace(",", ""))
-                slovar_knjige["st_reviewov"] = int(re.findall(vzorec_st_reviewov, besedilo)[0].replace(",", ""))
-                slovar_knjige["nagrade"] = spremeni_v_apostrof(re.findall(vzorec_nagrade, besedilo))
-                slovar_knjige["zanri"] = re.findall(vzorec_zanr, besedilo)[:3]
-                vse_knjige.append(slovar_knjige)
+                knjiga = re.findall(vzorec_knjiga, besedilo)
+                if knjiga != []:#tu zaznamo podstrani z napako in jih preskocimo(npr. https://www.goodreads.com/book/show/18765.I_Claudius)
+                    slovar_knjige["knjiga"] = knjiga[0]
+                    slovar_knjige["id_knjige"] = id - error_counter
+                    slovar_knjige["avtor"] = re.findall(vzorec_avtor, besedilo)[0]
+                    slovar_knjige["id_avtor"] = int(id_avtor[k])
+                    slovar_knjige["serija"] = re.findall(vzorec_serija, besedilo) != []
+                    slovar_knjige["opis"] = predelaj_opis(izloci_opis(besedilo),slovar_knjige["knjiga"])
+                    leto = re.findall(vzorec_leto2, besedilo)
+                    if leto != []:
+                        slovar_knjige["leto"] = int(leto[0])
+                    else:
+                        leto = re.findall(vzorec_leto, besedilo)
+                        if leto != []:
+                            slovar_knjige["leto"] = int(leto[0])
+                        else:
+                            slovar_knjige["leto"] = "unknown"
+                    #slovar_knjige["leto"] = int(re.findall(vzorec_leto, besedilo)[0])
+                    zalozba = re.findall(vzorec_zalozba, besedilo)
+                    if zalozba != []:
+                        slovar_knjige["zalozba"] = zalozba[0]
+                    else:
+                        slovar_knjige["zalozba"] = "unknown"
+                    #slovar_knjige["zalozba"] = re.findall(vzorec_zalozba, besedilo)[0]
+                    slovar_knjige["povprecna_ocena"] = float(re.findall(vzorec_povprecna_ocena, besedilo)[0])
+                    slovar_knjige["score"] = int(score[k].replace(",", ""))
+                    slovar_knjige["st_glasov"] = int(st_glasov[k].replace(",", ""))
+                    slovar_knjige["st_ocen"] = int(re.findall(vzorec_st_ocen, besedilo)[0].replace(",", ""))
+                    slovar_knjige["st_reviewov"] = int(re.findall(vzorec_st_reviewov, besedilo)[0].replace(",", ""))
+                    slovar_knjige["nagrade"] = spremeni_v_apostrof(re.findall(vzorec_nagrade, besedilo))
+                    slovar_knjige["zanri"] = re.findall(vzorec_zanr, besedilo)[:3]
+                    vse_knjige.append(slovar_knjige)
 
-                #naredimo slovar knjig brez zanrov in nagrad(uporabili ga bomp pri pisanju csv datoteke)
-                #zanre in nagrade izkljucimo, saj sta seznama z vec elementi
-                knjige_bzn = slovar_knjige.copy()
-                knjige_bzn.pop("zanri")
-                knjige_bzn.pop("nagrade")
-                knjige.append(knjige_bzn)
+                    #naredimo slovar knjig brez zanrov in nagrad(uporabili ga bomp pri pisanju csv datoteke)
+                    #zanre in nagrade izkljucimo, saj sta seznama z vec elementi
+                    knjige_bzn = slovar_knjige.copy()
+                    knjige_bzn.pop("zanri")
+                    knjige_bzn.pop("nagrade")
+                    knjige.append(knjige_bzn)
 
-                #ŽANRI
-                for zanr in slovar_knjige["zanri"]:
-                    zanri.append({"id_knjige": id, "zanr" : zanr})
-                    
-                #NAGRADE
-                for nagrada in slovar_knjige["nagrade"]:
-                    nagrade.append({"id_knjige": id, "nagrada" : nagrada})
-                    
-                    
+                    #ŽANRI
+                    for zanr in slovar_knjige["zanri"]:
+                        zanri.append({"id_knjige": id-error_counter, "zanr" : zanr})
+                        
+                    #NAGRADE
+                    for nagrada in slovar_knjige["nagrade"]:
+                        nagrade.append({"id_knjige": id-error_counter, "nagrada" : nagrada})
+                else:
+                    error_counter += 1     
+                        
                 id += 1
                 k += 1
 
-    #naredimo json file              
-    zapisi_json(vse_knjige, 'Pridobivanje_podatkov/vse_knjige.json')
+            #naredimo json file              
+            zapisi_json(vse_knjige, 'PODATKI/vse_knjige{}.json'.format(i))
 
-    #NAREDIMO CSV FILE
+            #NAREDIMO CSV FILE
     
-    #naredimo "glavni file" knjige, ki vsebuje vse podatke razen zanrov in nagrad(to sta seznama z vec podatki)
-    zapisi_csv(knjige, seznam_kljucev(knjige[0]), 'Pridobivanje_podatkov/knjige.csv')
+            #naredimo "glavni file" knjige, ki vsebuje vse podatke razen zanrov in nagrad(to sta seznama z vec podatki)
+            zapisi_csv(knjige, seznam_kljucev(knjige[0]), 'PODATKI/knjige{}.csv'.format(i))
 
-    #naredimo še fila za zanre in nagrade, kjer zanr in nagrado priredimo id-ju knjige
-    zapisi_csv(zanri, seznam_kljucev(zanri[0]), 'Pridobivanje_podatkov/zanri.csv')
+            #naredimo še fila za zanre in nagrade, kjer zanr in nagrado priredimo id-ju knjige
+            zapisi_csv(zanri, seznam_kljucev(zanri[0]), 'PODATKI/zanri{}.csv'.format(i))
 
-    zapisi_csv(nagrade, ["id_knjige", "nagrada"], 'Pridobivanje_podatkov/nagrade.csv')
+            zapisi_csv(nagrade, ["id_knjige", "nagrada"], 'PODATKI/nagrade{}.csv'.format(i))
+
+
+
+
+
+
+
+    # #naredimo json file              
+    # zapisi_json(vse_knjige, 'Pridobivanje_podatkov/vse_knjige.json')
+
+    # #NAREDIMO CSV FILE
+    
+    # #naredimo "glavni file" knjige, ki vsebuje vse podatke razen zanrov in nagrad(to sta seznama z vec podatki)
+    # zapisi_csv(knjige, seznam_kljucev(knjige[0]), 'Pridobivanje_podatkov/knjige2.csv')
+
+    # #naredimo še fila za zanre in nagrade, kjer zanr in nagrado priredimo id-ju knjige
+    # zapisi_csv(zanri, seznam_kljucev(zanri[0]), 'Pridobivanje_podatkov/zanri2.csv')
+
+    # zapisi_csv(nagrade, ["id_knjige", "nagrada"], 'Pridobivanje_podatkov/nagrade2.csv')
 
 
         
