@@ -170,6 +170,7 @@ def zapisi_csv(slovarji, imena_polj, ime_datoteke):
             writer.writerow(slovar)
 
 
+
 def seznam_kljucev(slovar):
     """funkcija da kljuce slovarja v seznam, ki ga lahko uporabimo za poimenovanje
     stolpcev v csv filu"""
@@ -195,9 +196,9 @@ def main(redownload=True, reparse=True):
     #spletna stran ima vsake toliko časa napako(npr. https://www.goodreads.com/book/show/18765.I_Claudius)
     #te knjige moramo izlociti(to naredimo, ko ugotovimo da "knjiga nima naslova")
     #id te knjige damo naslednji knjigi, zato vzpostavimo error_counter
-    error_counter = 0
+    #error_counter = 0
     # Najprej v lokalno datoteko shranimo eno od glavnih strani
-    for i in range(1, 5):#ST_STRANI + 1):
+    for i in range(25,35):#ST_STRANI + 1):
         print("koncal {} stran".format(i-1))
         #vse podatke o knjigah(shranjeni so v slovarju) shranimo v sezname:
         #seznam, uporabljen za json file
@@ -250,7 +251,7 @@ def main(redownload=True, reparse=True):
                 knjiga = re.findall(vzorec_knjiga, besedilo)
                 if knjiga != []:#tu zaznamo podstrani z napako in jih preskocimo(npr. https://www.goodreads.com/book/show/18765.I_Claudius)
                     slovar_knjige["knjiga"] = knjiga[0]
-                    slovar_knjige["id_knjige"] = id - error_counter
+                    slovar_knjige["id_knjige"] = id #- error_counter
                     slovar_knjige["avtor"] = re.findall(vzorec_avtor, besedilo)[0]
                     slovar_knjige["id_avtor"] = int(id_avtor[k])
                     slovar_knjige["serija"] = re.findall(vzorec_serija, besedilo) != []
@@ -279,6 +280,7 @@ def main(redownload=True, reparse=True):
                     slovar_knjige["nagrade"] = spremeni_v_apostrof(re.findall(vzorec_nagrade, besedilo))
                     slovar_knjige["zanri"] = re.findall(vzorec_zanr, besedilo)[:3]
                     vse_knjige.append(slovar_knjige)
+                    ima_nagrade = (slovar_knjige["nagrade"] != [])
 
                     #naredimo slovar knjig brez zanrov in nagrad(uporabili ga bomp pri pisanju csv datoteke)
                     #zanre in nagrade izkljucimo, saj sta seznama z vec elementi
@@ -286,16 +288,21 @@ def main(redownload=True, reparse=True):
                     knjige_bzn.pop("zanri")
                     knjige_bzn.pop("nagrade")
                     knjige.append(knjige_bzn)
+                    knjige_bzn["nagrade"]=ima_nagrade
+
 
                     #ŽANRI
                     for zanr in slovar_knjige["zanri"]:
-                        zanri.append({"id_knjige": id-error_counter, "zanr" : zanr})
+                        #zanri.append({"id_knjige": id-error_counter, "zanr" : zanr})
+                        zanri.append({"id_knjige": id, "zanr" : zanr})
                         
                     #NAGRADE
                     for nagrada in slovar_knjige["nagrade"]:
-                        nagrade.append({"id_knjige": id-error_counter, "nagrada" : nagrada})
-                else:
-                    error_counter += 1     
+                        #nagrade.append({"id_knjige": id-error_counter, "nagrada" : nagrada})
+                        nagrade.append({"id_knjige": id, "nagrada" : nagrada})
+                # else:
+                #     error_counter += 1 
+                #     print("ec is:{}".format(error_counter))    
                         
                 id += 1
                 k += 1
@@ -313,6 +320,8 @@ def main(redownload=True, reparse=True):
 
             zapisi_csv(nagrade, ["id_knjige", "nagrada"], 'PODATKI/nagrade{}.csv'.format(i))
 
+           
+            
 
 
 
@@ -320,17 +329,17 @@ def main(redownload=True, reparse=True):
 
 
     # #naredimo json file              
-    # zapisi_json(vse_knjige, 'Pridobivanje_podatkov/vse_knjige.json')
+    # zapisi_json(vse_knjige, 'PODATKI/vse_knjige.json')
 
     # #NAREDIMO CSV FILE
     
     # #naredimo "glavni file" knjige, ki vsebuje vse podatke razen zanrov in nagrad(to sta seznama z vec podatki)
-    # zapisi_csv(knjige, seznam_kljucev(knjige[0]), 'Pridobivanje_podatkov/knjige2.csv')
+    # zapisi_csv(knjige, seznam_kljucev(knjige[0]), 'PODATKI/knjige.csv')
 
     # #naredimo še fila za zanre in nagrade, kjer zanr in nagrado priredimo id-ju knjige
-    # zapisi_csv(zanri, seznam_kljucev(zanri[0]), 'Pridobivanje_podatkov/zanri2.csv')
+    # zapisi_csv(zanri, seznam_kljucev(zanri[0]), 'PODATKI/zanri.csv')
 
-    # zapisi_csv(nagrade, ["id_knjige", "nagrada"], 'Pridobivanje_podatkov/nagrade2.csv')
+    # zapisi_csv(nagrade, ["id_knjige", "nagrada"], 'PODATKI/nagrade.csv')
 
 
         
