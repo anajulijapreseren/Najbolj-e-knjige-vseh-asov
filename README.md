@@ -24,6 +24,8 @@ id_knjige,zanr<br/>
 nagrade.csv vsebujejo:<br/>
 id_knjige,nagrada<br/>
 
+Pri nalaganju podatkov lahko hkrati nalagamo tudi le po sto podatkov in vsako stoterico shranimo v svojo datoteko(seveda lahko hkrati sprožimo nalaganje več kot ene datoteke). Za pridobitev ustreznih podatkov moramo namreč obiskati podstran vsake knjige, za kar porabimo precej časa, s pridobivanjem podatkov po delih pa lahko proces tudi prekinemo in naslednjič nadaljujemo, ob morebitni napaki pa ohranimo vsaj podatke, ki so že zapisani v datoteke. Dobljene csv datoteke kasneje združimo s pogonom datoteke zdruzi_csv.py. Funkcija je vzeta s https://www.freecodecamp.org/news/how-to-combine-multiple-csv-files-with-8-lines-of-code-265183e0854/.
+
 Opomba: trenutno je v csv datotekah naloženih le 100 knjig. Preostale knjige bom naložila, ko se bom odločila, koliko knjig bom analizirala. Spletna stran ima namreč podstrani, kar pomeni, da je treba za 10000 knjig prenesti 10000 datotek (in še 100 za naložitev "glavnih strani")
 
 
