@@ -223,6 +223,8 @@ def spremeni_v_apostrof(seznam):
 def main(redownload=True, reparse=True):
     #spletna stran ima vsake toliko časa "sesuto" podstran knjige
     #(npr. https://www.goodreads.com/book/show/18765.I_Claudius)
+    #opomba:pri zadnjem pregledu sem ugotovila, da spletna stran spet obstaja, vendar pa
+    #ne škodi, da še vedno preverim za morebitne napake
     #te knjige moramo izlociti(to naredimo, ko ugotovimo da "knjiga nima naslova")
 
     # Najprej v lokalno datoteko shranimo eno od glavnih strani
