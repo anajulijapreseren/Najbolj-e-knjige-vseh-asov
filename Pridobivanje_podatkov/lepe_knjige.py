@@ -4,12 +4,14 @@ import requests
 import re
 import math
 import os.path
-
-
 import json
 import sys
 
-SKUPNO_ST_KNJIG = 100
+#--------------------------------------------------------------------------------------------------
+#Definiramo konstante za število knjig in poimenujemo spletne strani ter datoteke in direktorije, 
+#v katere bomo shranjevali podatke
+
+SKUPNO_ST_KNJIG = 5000
 ST_KNJIG_NA_STRAN = 100 #konstantno, ne moremo spremeniti
 ST_STRANI = math.ceil(SKUPNO_ST_KNJIG / ST_KNJIG_NA_STRAN)
 
@@ -26,18 +28,23 @@ subpage_filename = 'book_subpage.html'
 # ime CSV datoteke v katero bomo shranili podatke
 csv_filename = 'best_books.csv'
 
-
+#--------------------------------------------------------------------------------------------------
 #REGEX VZORCI:
 
+#vzorci, ki jih uporabimo na glavni strani(frontpage):
+
+#url naslove poberemo, da lahko obiščemo podstran vsake knjige in pridobimo ostale podatke
 vzorec_url = r'href=[\'"]?\/book\/show\/([^\'" >]+)'
 vzorec_id_avtor = r'author\/show\/(\d+)'
 vzorec_score = r'score: (.+)<\/a>'
 vzorec_st_glasov = r'false;">(.+) people voted<\/a>'
+
+#vzorci, ki jih uporabimo na podstrani(subpage):
 vzorec_avtor = r'<span itemprop="name">(?P<avtor>[^<]+)<+?'                  
 vzorec_knjiga = r'<h1 id="bookTitle".*itemprop="name">\s*(?P<knjiga>.*)\s*</h1>'
 vzorec_serija = r'<div class="infoBoxRowTitle">(Series)</div>'
 vzorec_povprecna_ocena = r'<span itemprop="ratingValue">\n*\s*(?P<povprecna_ocena>.+)\n*</span>'
-vzorec_leto = r'<div class="row">\s*Published\s*.*(?P<leto>\d{4})\s*by'
+
 vzorec_zalozba = r'<div class="row">\s*Published\s*.*\d{4}\s*by (?P<zalozba>.*)\s+'
 vzorec_st_ocen = r'<meta itemprop="ratingCount" content="(?P<ratings>\d*)"\s*/>'
 vzorec_st_reviewov = r'<meta itemprop="reviewCount" content="(?P<reviews>\d*)"\s*/>'
@@ -45,21 +52,35 @@ vzorec_zanr = r'people shelved this book as &#39;(?P<zanr>.+)&#39;'
 vzorec_st_ocen_zanra = r'(?P<st_ocen_zanra>\d+) people shelved this book as &#39;'
 vzorec_nagrade = r'award\/show\/.*?>(?P<nagrade>.+?)(?:\(|<)'
 vzorec_leto_nagrade = r'award/show/.*?>.+?\((?P<leto_nagrade>\d*)\)</a>'
-#ta vzopec je za prvo leto izida (first published in _)saj so nekatere knjige izdali večkrat
-vzorec_leto2 = r'<div class="row">\s*Published\s*<nobr class="greyText">\s*\(.*(?P<leto>\d{4})\)\s*<\/nobr>'
 
+#ta vzorec je za prvo leto izida (first published in _)saj so nekatere knjige izdali večkrat
+vzorec_leto1 = r'<div class="row">\s*Published\s*<nobr class="greyText">\s*\(.*(?P<leto>\d{4})\)\s*<\/nobr>'
+#splošen vzorec za leto izida
+vzorec_leto2 = r'<div class="row">\s*Published\s*.*(?P<leto>\d{4})\s*by'
+
+#Opisi knjig so različno dolgi, zato so nekateri v celoti zapisani v okvirčku, pri drugih pa moramo klikniti "more"
+#če uporabimo le vzorec za krajše besedilo, na koncu daljšega zapisa dobimo "..."
+#če uporabimo le vzorec za daljše besedilo, pa pri krajšem zapisu preskoči v komentarje in kot opis zajame
+#prvi komentar
+#Zato z zgornjima regularnima izrazoma preverimo ali je opis dolg ali kratek, 
+#nato pa uporabimo ustreznega od spodnjih opisov.
 vzorec_st_opisa = r'<span id="freeTextContainer(\d+)">'
 vzorec_podrobnega_opisa = '<span id="freeText{}" style=".*">'
 
 vzorec_opis_navaden = r'<span id="freeTextContainer\d+">(.*?)</span>'
 vzorec_opis_podroben = r'<span id="freeText\d+" style=".*?">(?:Alternate.*?<br \/>)*(.*?)<\/span>'
 
+#--------------------------------------------------------------------------------------------------
+#FUNKCIJE za pripravo/prenos/zapis datotek:
+#Funkcije: pripravi_imenik, zapisi_json in zapisi_csv so vzete iz 
+#https://github.com/matijapretnar/programiranje-1/tree/master/02-zajem-podatkov/predavanja iz datoteke orodja.py.
 
 def pripravi_imenik(ime_datoteke):
     '''Če še ne obstaja, pripravi prazen imenik za dano datoteko.'''
     imenik = os.path.dirname(ime_datoteke)
     if imenik:
         os.makedirs(imenik, exist_ok=True)
+
 
 def zapisi_json(objekt, ime_datoteke):
     '''Iz danega objekta ustvari JSON datoteko.'''
@@ -114,6 +135,21 @@ def save_frontpage(page, directory, filename):
     raise NotImplementedError()
 
 
+def zapisi_csv(slovarji, imena_polj, ime_datoteke):
+    '''Iz seznama slovarjev ustvari CSV datoteko z glavo.'''
+    pripravi_imenik(ime_datoteke)
+    with open(ime_datoteke, 'w', encoding='utf-8') as csv_datoteka:
+        writer = csv.DictWriter(csv_datoteka, fieldnames=imena_polj)
+        writer.writeheader()
+        for slovar in slovarji:
+            writer.writerow(slovar)
+
+
+#--------------------------------------------------------------------------------------------------
+#FUNKCIJE za zajem opisa in olepšavo/popravek zajetega besedila:
+
+
+#funkcija,ki ugotovi ali moramo vzeti izraz za kratek ali dolg opis
 def izloci_opis(html_text):
     stevke = re.findall(vzorec_st_opisa, html_text)[0]
     podroben_opis = re.findall(vzorec_podrobnega_opisa.format(stevke), html_text)
@@ -160,17 +196,6 @@ def predelaj_opis(opis, naslov):
     return opis
 
 
-def zapisi_csv(slovarji, imena_polj, ime_datoteke):
-    '''Iz seznama slovarjev ustvari CSV datoteko z glavo.'''
-    pripravi_imenik(ime_datoteke)
-    with open(ime_datoteke, 'w', encoding='utf-8') as csv_datoteka:
-        writer = csv.DictWriter(csv_datoteka, fieldnames=imena_polj)
-        writer.writeheader()
-        for slovar in slovarji:
-            writer.writerow(slovar)
-
-
-
 def seznam_kljucev(slovar):
     """funkcija da kljuce slovarja v seznam, ki ga lahko uporabimo za poimenovanje
     stolpcev v csv filu"""
@@ -192,13 +217,16 @@ def spremeni_v_apostrof(seznam):
     return sez
 
 
+#--------------------------------------------------------------------------------------------------
+#GLAVNA FUNKCIJA:
+
 def main(redownload=True, reparse=True):
-    #spletna stran ima vsake toliko časa napako(npr. https://www.goodreads.com/book/show/18765.I_Claudius)
+    #spletna stran ima vsake toliko časa "sesuto" podstran knjige
+    #(npr. https://www.goodreads.com/book/show/18765.I_Claudius)
     #te knjige moramo izlociti(to naredimo, ko ugotovimo da "knjiga nima naslova")
-    #id te knjige damo naslednji knjigi, zato vzpostavimo error_counter
-    #error_counter = 0
+
     # Najprej v lokalno datoteko shranimo eno od glavnih strani
-    for i in range(25,35):#ST_STRANI + 1):
+    for i in range(1,ST_STRANI + 1):
         print("koncal {} stran".format(i-1))
         #vse podatke o knjigah(shranjeni so v slovarju) shranimo v sezname:
         #seznam, uporabljen za json file
@@ -215,9 +243,10 @@ def main(redownload=True, reparse=True):
         #shranimo eno od strani, ki jih moramo analizirati
         save_frontpage(book_frontpage_url.format(i), book_directory, frontpage_filename)
 
-        #iz te strani poberemo podatke, ki jih ne najdemo na podstrani posamezne knjige in url, ki
-        #nas bo peljal na podstran vsake knjige, da dobimo ostale podatke
-        #ko poberemo podatke z vseh podstrani naložimo novo stran in pri tem povozimo staro datoteko
+        #Iz te strani poberemo podatke, ki jih ne najdemo na podstrani posamezne knjige in url, ki
+        #nas bo peljal na podstran vsake knjige, da dobimo ostale podatke.
+        #Ko poberemo podatke z vseh podstrani naložimo novo stran in pri tem povozimo staro datoteko, 
+        #saj je več ne potrebujemo.
     
         with open(r"C:\Users\Ana Julija\Documents\Najbolj-e-knjige-vseh-asov\Pridobivanje_podatkov\best_books.html", "r", encoding="utf-8") as s:    
             string = s.read()
@@ -229,7 +258,7 @@ def main(redownload=True, reparse=True):
             score.extend(re.findall(vzorec_score, string))
             st_glasov.extend(re.findall(vzorec_st_glasov, string))
 
-            #url vsake podstrani se ponovi 2x, zato odstranimo ponovitev
+            #url vsake podstrani se ponovi 2x, zato bomo pri delu z njimi šli za 2 naprej.
             urlji = re.findall(vzorec_url, string)
         
         #sedaj moramo prenesti podstran vsake knjige:
@@ -249,29 +278,36 @@ def main(redownload=True, reparse=True):
 
                 #KNJIGE
                 knjiga = re.findall(vzorec_knjiga, besedilo)
-                if knjiga != []:#tu zaznamo podstrani z napako in jih preskocimo(npr. https://www.goodreads.com/book/show/18765.I_Claudius)
+                if knjiga != []:#tu zaznamo podstrani z napako in jih preskocimo
                     slovar_knjige["knjiga"] = knjiga[0]
-                    slovar_knjige["id_knjige"] = id #- error_counter
+                    slovar_knjige["id_knjige"] = id 
                     slovar_knjige["avtor"] = re.findall(vzorec_avtor, besedilo)[0]
                     slovar_knjige["id_avtor"] = int(id_avtor[k])
                     slovar_knjige["serija"] = re.findall(vzorec_serija, besedilo) != []
                     slovar_knjige["opis"] = predelaj_opis(izloci_opis(besedilo),slovar_knjige["knjiga"])
-                    leto = re.findall(vzorec_leto2, besedilo)
+                    leto = re.findall(vzorec_leto1, besedilo)
+
                     if leto != []:
                         slovar_knjige["leto"] = int(leto[0])
                     else:
-                        leto = re.findall(vzorec_leto, besedilo)
+                        leto = re.findall(vzorec_leto2, besedilo)
                         if leto != []:
                             slovar_knjige["leto"] = int(leto[0])
                         else:
+                            #tu sem naredila napako, saj sem namesto None zapisala "unknown", 
+                            #kar mi je povzročalo težavo pri delu z letom(vse je oblike string)
                             slovar_knjige["leto"] = "unknown"
-                    #slovar_knjige["leto"] = int(re.findall(vzorec_leto, besedilo)[0])
+                            #bolje:
+                            #slovar_knjige["leto"] = None
+
                     zalozba = re.findall(vzorec_zalozba, besedilo)
                     if zalozba != []:
                         slovar_knjige["zalozba"] = zalozba[0]
                     else:
+                        #Tudi tu bi bilo morda bolje vzeti None
                         slovar_knjige["zalozba"] = "unknown"
-                    #slovar_knjige["zalozba"] = re.findall(vzorec_zalozba, besedilo)[0]
+                        #slovar_knjige["zalozba"] = None
+                    
                     slovar_knjige["povprecna_ocena"] = float(re.findall(vzorec_povprecna_ocena, besedilo)[0])
                     slovar_knjige["score"] = int(score[k].replace(",", ""))
                     slovar_knjige["st_glasov"] = int(st_glasov[k].replace(",", ""))
@@ -288,29 +324,33 @@ def main(redownload=True, reparse=True):
                     knjige_bzn.pop("zanri")
                     knjige_bzn.pop("nagrade")
                     knjige.append(knjige_bzn)
+                    #Dodamo stolpec "nagrade", da bomo pri analizi takoj ločili med knjigami brez/z nagradami.
                     knjige_bzn["nagrade"]=ima_nagrade
 
 
                     #ŽANRI
                     for zanr in slovar_knjige["zanri"]:
-                        #zanri.append({"id_knjige": id-error_counter, "zanr" : zanr})
                         zanri.append({"id_knjige": id, "zanr" : zanr})
                         
                     #NAGRADE
                     for nagrada in slovar_knjige["nagrade"]:
-                        #nagrade.append({"id_knjige": id-error_counter, "nagrada" : nagrada})
                         nagrade.append({"id_knjige": id, "nagrada" : nagrada})
-                # else:
-                #     error_counter += 1 
-                #     print("ec is:{}".format(error_counter))    
+  
                         
                 id += 1
                 k += 1
 
-            #naredimo json file              
-            zapisi_json(vse_knjige, 'PODATKI/vse_knjige{}.json'.format(i))
+            #naredimo json file (json datotek na koncu nisem uporabljala, bom pa pustila kodo, 
+            #če jo bom potrebovala kdaj kasneje)             
+            #zapisi_json(vse_knjige, 'PODATKI/vse_knjige{}.json'.format(i))
 
             #NAREDIMO CSV FILE
+            #Vsakih sto knjig podatke shranimo v csv datoteke.
+            #Tako računalniku ni potrebno držati vseh podatkov v nekem seznamu/slovarju +
+            #Spletna stran pri prevelikem prenosu strani neha servirati podatke.
+            #Takrat lahko proces ustavimo, pri "for i in range(1,ST_STRANI + 1):" spremenimo 1 v številko strani,
+            #kjer smo končali (vidiš po končnici csv datotek) in nadaljujemo.
+            #Vse csv datoteke lahko kasneje združimo s pogonom "zdruzi_csv.py"
     
             #naredimo "glavni file" knjige, ki vsebuje vse podatke razen zanrov in nagrad(to sta seznama z vec podatki)
             zapisi_csv(knjige, seznam_kljucev(knjige[0]), 'PODATKI/knjige{}.csv'.format(i))
@@ -319,33 +359,6 @@ def main(redownload=True, reparse=True):
             zapisi_csv(zanri, seznam_kljucev(zanri[0]), 'PODATKI/zanri{}.csv'.format(i))
 
             zapisi_csv(nagrade, ["id_knjige", "nagrada"], 'PODATKI/nagrade{}.csv'.format(i))
-
-           
-            
-
-
-
-
-
-
-    # #naredimo json file              
-    # zapisi_json(vse_knjige, 'PODATKI/vse_knjige.json')
-
-    # #NAREDIMO CSV FILE
-    
-    # #naredimo "glavni file" knjige, ki vsebuje vse podatke razen zanrov in nagrad(to sta seznama z vec podatki)
-    # zapisi_csv(knjige, seznam_kljucev(knjige[0]), 'PODATKI/knjige.csv')
-
-    # #naredimo še fila za zanre in nagrade, kjer zanr in nagrado priredimo id-ju knjige
-    # zapisi_csv(zanri, seznam_kljucev(zanri[0]), 'PODATKI/zanri.csv')
-
-    # zapisi_csv(nagrade, ["id_knjige", "nagrada"], 'PODATKI/nagrade.csv')
-
-
-        
-                
-
-
 
 
 
