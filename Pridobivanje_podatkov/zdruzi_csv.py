@@ -1,3 +1,6 @@
+#Funkcija združevanja datotek je vzeta s 
+#https://www.freecodecamp.org/news/how-to-combine-multiple-csv-files-with-8-lines-of-code-265183e0854/.
+
 import os
 import glob
 import pandas as pd
